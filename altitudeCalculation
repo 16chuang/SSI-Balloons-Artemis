@@ -1,0 +1,17 @@
+// Formula source: http://hyperphysics.phy-astr.gsu.edu/hbase/kinetic/barfor.html
+// Tables of pressure/temp values: http://www.pdas.com/atmos.html
+
+// Ph = P0 * e^(-mgh/(kT))
+// e^(-mgh/(kt)) = Ph/P0
+// -mgh/(kT) = ln(Ph/P0)
+// h = -(kT)/(mg)*ln(Ph/P0)
+// h = (kT)/(mg)*ln(P0/Ph)
+
+// pressure should be in kPa
+// temperature should be in Kelvin
+double getAltitude(double pressure, double temperature) {
+  // 101.3 is sea level pressure, in kPa
+  // 32 is roughly (k)/(mg), derived from experimental data
+  // expect accuracy within 5%
+  return 32.0 * temperature * log(101.3 / pressure);
+}
