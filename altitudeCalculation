@@ -1,5 +1,6 @@
 // Formula source: http://hyperphysics.phy-astr.gsu.edu/hbase/kinetic/barfor.html
 // Tables of pressure/temp values: http://www.pdas.com/atmos.html
+// Google Sheet of some regression https://docs.google.com/spreadsheets/d/12Vh-a2sGq0gPXDVB9QPcE8igVycuMmxSEa5OMRkGPj4/edit?usp=sharing
 
 // Ph = P0 * e^(-mgh/(kT))
 // e^(-mgh/(kt)) = Ph/P0
