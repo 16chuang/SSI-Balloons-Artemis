@@ -28,6 +28,8 @@
 Adafruit_MAX31855 thermocouple(MAXCLK, MAXCS, MAXDO);
 Adafruit_BMP280 bme(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK); // temp and pressure sensor
 
+int max_altitude = 0;
+
 // ========= SENSOR VALUE VARIABLES =========
 int internal_temp = 0;
 int external_temp = 0;
@@ -39,9 +41,16 @@ float longitude = 0.0;
 // ========= HELPER FUNCTION PROTOTYPES =========
 void readAndLogSensors();
 void regulateTemp();
-void checkParachute();
+void checkAltitude();
+void deployParachute();
 void sensorWriteToSD(float data, String sensorName);
 
+// ========= CONSTANTS =========
+int TEMP_THRESHOLD = 0; // celcius
+int ALTITUDE_DIFF_THRESHOLD = 100; // meters
+
+
+// ========= SETUP FUNCTION =========
 void setup() {
   Serial.begin(9600);
 
@@ -62,11 +71,18 @@ void setup() {
   delay(2000);
 }
 
+// ========= MAIN LOOP FUNCTION =========
 void loop() {
     readAndLogSensors();
+
+    // run checks
+    checkAltitude();
+    regulateTemp();
     
     delay(1000);
 }
+
+// ========= HELPER FUNCTIONS =========
 
 /* 
  * Reads all sensor values, stores them in global variables, 
@@ -80,14 +96,41 @@ void readAndLogSensors() {
     sensorWriteToSD(pressure, "pressure");
 
     altitude = bme.readAltitude(1011);
-    sensorWriteToSD(altitude, "altitude");
+    sensorWriteToSD(altitude, "altitude_meters");
+    float altitude_feet = altitude * 3.28; // conversion meters to feet
+    sensorWriteToSD(altitude_feet, "altitude_feet"); 
 
     external_temp = thermocouple.readCelsius();
     sensorWriteToSD(external_temp, "external_temp");
 }
 
+/*
+ * If temperature dips below a threshold, turn on heating pads.
+ */
 void regulateTemp() {
-  
+    if (internal_temp < TEMP_THRESHOLD) {
+        // turn heaters on
+    }
+}
+
+/* 
+ * Checks if the payload is starting to fall. If so, deploy the parachute.
+ */
+void checkAltitude() {
+    if (altitude > max_altitude) { // update max altitude
+        max_altitude = altitude;
+    }
+
+    if (altitude <= (max_altitude - ALTITUDE_DIFF_THRESHOLD)) {
+        deployParachute();
+    }
+}
+
+/*
+ * Heats up wire to cut the parachute cables.
+ */
+void deployParachute() {
+    // fill me in!
 }
 
 /* 
