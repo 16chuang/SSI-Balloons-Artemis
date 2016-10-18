@@ -35,15 +35,17 @@ int internal_temp = 0;
 int external_temp = 0;
 int pressure = 0;
 int altitude = 0;
+float altitude_feet = 0.0;
 float latitude = 0.0;
 float longitude = 0.0;
 
 // ========= HELPER FUNCTION PROTOTYPES =========
-void readAndLogSensors();
+void readSensors();
 void regulateTemp();
 void checkAltitude();
 void deployParachute();
-void sensorWriteToSD(float data, String sensorName);
+void writeHeaderToSD();
+void writeDataToSD();
 
 // ========= CONSTANTS =========
 int TEMP_THRESHOLD = 0; // celcius
@@ -67,13 +69,15 @@ void setup() {
   Serial.println("BMP initialization done.");
 
   pinMode(SD_CS, OUTPUT);
+  writeHeaderToSD();
   
   delay(2000);
 }
 
 // ========= MAIN LOOP FUNCTION =========
 void loop() {
-    readAndLogSensors();
+    readSensors();
+    writeDataToSD();
 
     // run checks
     checkAltitude();
@@ -85,23 +89,17 @@ void loop() {
 // ========= HELPER FUNCTIONS =========
 
 /* 
- * Reads all sensor values, stores them in global variables, 
- * and writes them to the SD card.
+ * Reads all sensor values and stores them in global variables.
  */
-void readAndLogSensors() {
+void readSensors() {
     internal_temp = bme.readTemperature();
-    sensorWriteToSD(internal_temp, "internal_temp");
-
+    
     pressure = bme.readPressure();
-    sensorWriteToSD(pressure, "pressure");
-
+    
     altitude = bme.readAltitude(1011);
-    sensorWriteToSD(altitude, "altitude_meters");
-    float altitude_feet = altitude * 3.28; // conversion meters to feet
-    sensorWriteToSD(altitude_feet, "altitude_feet"); 
+    altitude_feet = altitude * 3.28; // conversion meters to feet
 
     external_temp = thermocouple.readCelsius();
-    sensorWriteToSD(external_temp, "external_temp");
 }
 
 /*
@@ -133,21 +131,45 @@ void deployParachute() {
     // fill me in!
 }
 
-/* 
- * Given a sensor reading and a name, the function formats 
- * and logs values to the appropriate files on the SD card.
+/*
+ * Writes CSV header row for data file.
  */
-void sensorWriteToSD(float data, String sensorName){
-    File myFile = SD.open(sensorName+".txt", FILE_WRITE);
+void writeHeaderToSD() {
+    File myFile = SD.open("data.txt", FILE_WRITE);
     if(myFile) {
-        myFile.print(data);
-        Serial.print("wrote ");
-        Serial.println(data);
-        myFile.close();
-        Serial.println("done.");
+      myFile.println("INTERNAL_TEMP,EXTERNAL_TEMP,PRESSURE,ALTITUDE,ALTITUDE_FT,LONGITUDE,LATITUDE");
+      Serial.println("wrote header");
+      myFile.close();
     } else {
-        Serial.print("error opening ");
-        Serial.println(sensorName);
+      Serial.println("error opening :(");
+    }
+}
+
+/* 
+ * Formats sensor readings into CSV and writes a new row
+ * to data.txt on the SD card.
+ */
+void writeDataToSD() {
+    File myFile = SD.open("data.txt", FILE_WRITE);
+    if(myFile) {
+        myFile.print(internal_temp);
+        myFile.print(",");
+        myFile.print(external_temp);
+        myFile.print(",");
+        myFile.print(pressure);
+        myFile.print(",");
+        myFile.print(altitude);
+        myFile.print(",");
+        myFile.print(altitude_feet);
+        myFile.print(",");
+        myFile.print(longitude);
+        myFile.print(",");
+        myFile.print(latitude);
+        myFile.println("");
+        Serial.println("wrote to file");
+        myFile.close();
+    } else {
+        Serial.println("error opening :(");
     }  
 }
 
