@@ -4,7 +4,8 @@
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h>
-#include "Adafruit_MAX31855.h"
+#include <Adafruit_GPS.h>
+#include <Adafruit_MAX31855.h>
 
 // ========= PIN ASSIGNMENTS =========
 // thermocouple digital pins
@@ -28,6 +29,12 @@
 Adafruit_MAX31855 thermocouple(MAXCLK, MAXCS, MAXDO);
 Adafruit_BMP280 bme(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK); // temp and pressure sensor
 
+HardwareSerial mySerial = Serial1; // GPS
+Adafruit_GPS GPS(&Serial1);
+#define GPSECHO  true
+boolean usingInterrupt = false;
+
+
 int max_altitude = 0;
 
 // ========= SENSOR VALUE VARIABLES =========
@@ -36,8 +43,8 @@ int external_temp = 0;
 int pressure = 0;
 int altitude = 0;
 float altitude_feet = 0.0;
-float latitude = 0.0;
-float longitude = 0.0;
+float latitude = 0.0; char lat = ' ';
+float longitude = 0.0; char lon = ' ';
 
 // ========= HELPER FUNCTION PROTOTYPES =========
 void readSensors();
@@ -47,6 +54,8 @@ void deployParachute();
 void writeHeaderToSD();
 void writeDataToSD();
 
+void useInterrupt(boolean); // Func prototype keeps Arduino 0023 happy
+
 // ========= CONSTANTS =========
 int TEMP_THRESHOLD = 0; // celcius
 int ALTITUDE_DIFF_THRESHOLD = 100; // meters
@@ -54,7 +63,7 @@ int ALTITUDE_DIFF_THRESHOLD = 100; // meters
 
 // ========= SETUP FUNCTION =========
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   // temp and pressure sensor test
   Serial.println("BMP280 test");
@@ -68,10 +77,47 @@ void setup() {
   }
   Serial.println("BMP initialization done.");
 
+  // GPS setup
+  GPS.begin(9600);
+  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);   // 1 Hz update rate
+  GPS.sendCommand(PGCMD_ANTENNA); // Request updates on antenna status
+  mySerial.println(PMTK_Q_RELEASE);
+
   pinMode(SD_CS, OUTPUT);
   writeHeaderToSD();
   
   delay(2000);
+}
+
+/*
+ * MORE GPS SETUP
+ */
+
+// Interrupt is called once a millisecond, looks for any new GPS data, and stores it
+SIGNAL(TIMER0_COMPA_vect) {
+  char c = GPS.read();
+  // if you want to debug, this is a good time to do it!
+#ifdef UDR0
+  if (GPSECHO)
+    if (c) UDR0 = c;  
+    // writing direct to UDR0 is much much faster than Serial.print 
+    // but only one character can be written at a time. 
+#endif
+}
+
+void useInterrupt(boolean v) {
+  if (v) {
+    // Timer0 is already used for millis() - we'll just interrupt somewhere
+    // in the middle and call the "Compare A" function above
+    OCR0A = 0xAF;
+    TIMSK0 |= _BV(OCIE0A);
+    usingInterrupt = true;
+  } else {
+    // do not call the interrupt function COMPA anymore
+    TIMSK0 &= ~_BV(OCIE0A);
+    usingInterrupt = false;
+  }
 }
 
 // ========= MAIN LOOP FUNCTION =========
@@ -100,6 +146,17 @@ void readSensors() {
     altitude_feet = altitude * 3.28; // conversion meters to feet
 
     external_temp = thermocouple.readCelsius();
+
+    // GPS
+    char c = GPS.read();
+    if (GPS.newNMEAreceived()) {
+      if (!GPS.parse(GPS.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
+        return;  // we can fail to parse a sentence in which case we should just wait for another
+    }
+    longitude = GPS.longitude;
+    lon = GPS.lon;
+    latitude = GPS.latitude;
+    lat = GPS.lat;
 }
 
 /*
@@ -162,9 +219,9 @@ void writeDataToSD() {
         myFile.print(",");
         myFile.print(altitude_feet);
         myFile.print(",");
-        myFile.print(longitude);
+        myFile.print(longitude + String(lon));
         myFile.print(",");
-        myFile.print(latitude);
+        myFile.print(latitude + String(lat));
         myFile.println("");
         Serial.println("wrote to file");
         myFile.close();
