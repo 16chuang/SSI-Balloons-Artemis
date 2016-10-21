@@ -23,7 +23,7 @@
 #define SD_CS 53
 
 // heaters
-#define HEAT 9
+#define HEATER 9
 
 // ========= SENSOR INITIALIZATION =========
 Adafruit_MAX31855 thermocouple(MAXCLK, MAXCS, MAXDO);
@@ -86,6 +86,8 @@ void setup() {
 
   pinMode(SD_CS, OUTPUT);
   writeHeaderToSD();
+
+  pinMode(HEATER, OUTPUT);
   
   delay(2000);
 }
@@ -164,7 +166,9 @@ void readSensors() {
  */
 void regulateTemp() {
     if (internal_temp < TEMP_THRESHOLD) {
-        // turn heaters on
+        digitalWrite(HEATER, HIGH);
+    } else {
+        digitalWrite(HEATER, LOW);
     }
 }
 
@@ -185,7 +189,13 @@ void checkAltitude() {
  * Heats up wire to cut the parachute cables.
  */
 void deployParachute() {
+    // turn off heater
+    digitalWrite(HEATER, LOW);
+    // make sure rockblock isn't transmitting
+    
     // fill me in!
+    
+    delay(10000);
 }
 
 /*
@@ -220,8 +230,10 @@ void writeDataToSD() {
         myFile.print(altitude_feet);
         myFile.print(",");
         myFile.print(longitude + String(lon));
+        Serial.print(longitude + String(lon)); Serial.print(", ");
         myFile.print(",");
         myFile.print(latitude + String(lat));
+        Serial.println(latitude + String(lat));
         myFile.println("");
         Serial.println("wrote to file");
         myFile.close();
