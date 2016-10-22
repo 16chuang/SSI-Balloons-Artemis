@@ -6,6 +6,7 @@
 #include <Adafruit_BMP280.h>
 #include <Adafruit_GPS.h>
 #include <Adafruit_MAX31855.h>
+#include <IridiumSBD.h>
 
 // ========= PIN ASSIGNMENTS =========
 // thermocouple digital pins
@@ -60,6 +61,11 @@ void useInterrupt(boolean); // Func prototype keeps Arduino 0023 happy
 int TEMP_THRESHOLD = 0; // celcius
 int ALTITUDE_DIFF_THRESHOLD = 100; // meters
 
+// ========= ROCKBLOCK =========
+#define ssSerial Serial3
+IridiumSBD isbd(ssSerial, 2); // second param = sleep pin 
+int message_no = 0;
+
 
 // ========= SETUP FUNCTION =========
 void setup() {
@@ -88,6 +94,18 @@ void setup() {
   writeHeaderToSD();
 
   pinMode(HEATER, OUTPUT);
+
+  // Rockblock
+  int signalQuality = -1;
+  
+  ssSerial.begin(19200);
+  
+  isbd.attachConsole(Serial);
+  isbd.attachDiags(Serial);
+  isbd.setPowerProfile(1);
+  isbd.begin();
+  isbd.useMSSTMWorkaround(false);
+  
   
   delay(2000);
 }
@@ -126,6 +144,7 @@ void useInterrupt(boolean v) {
 void loop() {
     readSensors();
     writeDataToSD();
+    sendData();
 
     // run checks
     checkAltitude();
@@ -135,6 +154,29 @@ void loop() {
 }
 
 // ========= HELPER FUNCTIONS =========
+
+void sendData() {
+  char outBuffer[200];
+  String message = "";
+  message += internal_temp;
+  message += ",";
+  message += external_temp;
+  message += ",";
+  message += altitude;
+  message += ",";
+  message += latitude;
+  message += ",";
+  message += longitude;
+  message += ",";
+  message += message_no;
+
+  for(uint8_t i = 0; i < message.length(); i++) {
+    outBuffer[i] = message[i];
+  }
+
+  isbd.sendSBDText(outBuffer);
+  message_no++;
+}
 
 /* 
  * Reads all sensor values and stores them in global variables.
@@ -152,9 +194,12 @@ void readSensors() {
     // GPS
     char c = GPS.read();
     if (GPS.newNMEAreceived()) {
-      if (!GPS.parse(GPS.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
-        return;  // we can fail to parse a sentence in which case we should just wait for another
+//      if (!GPS.parse(GPS.lastNMEA())) {  // this also sets the newNMEAreceived() flag to false
+//        Serial.println("in GPS thingie-----------------");
+//        return;  // we can fail to parse a sentence in which case we should just wait for another
+//      }
     }
+    Serial.println(GPS.longitude);
     longitude = GPS.longitude;
     lon = GPS.lon;
     latitude = GPS.latitude;
@@ -235,10 +280,22 @@ void writeDataToSD() {
         myFile.print(latitude + String(lat));
         Serial.println(latitude + String(lat));
         myFile.println("");
-        Serial.println("wrote to file");
+//        Serial.println("wrote to file");
         myFile.close();
     } else {
         Serial.println("error opening :(");
     }  
+}
+
+bool ISBDCallback() {
+    readSensors();
+//    Serial.println("read sensors");
+    writeDataToSD();
+//    Serial.println("in isbd callback");
+
+    // run checks
+    checkAltitude();
+    regulateTemp();
+    return true;
 }
 
