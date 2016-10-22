@@ -7,6 +7,7 @@
 #include <Adafruit_GPS.h>
 #include <Adafruit_MAX31855.h>
 #include <IridiumSBD.h>
+#include <Time.h>
 
 // ========= PIN ASSIGNMENTS =========
 // thermocouple digital pins
@@ -25,6 +26,9 @@
 
 // heaters
 #define HEATER 9
+
+// nichrome wire
+#define NICHROME 6
 
 // ========= SENSOR INITIALIZATION =========
 Adafruit_MAX31855 thermocouple(MAXCLK, MAXCS, MAXDO);
@@ -97,6 +101,7 @@ void setup() {
   writeHeaderToSD();
 
   pinMode(HEATER, OUTPUT);
+  pinMode(NICHROME, OUTPUT);
 
   // Rockblock
   int signalQuality = -1;
@@ -150,7 +155,7 @@ void loop() {
     sendData();
 
     // run checks
-    checkAltitude();
+//    checkAltitude();
     regulateTemp();
     
     delay(1000);
@@ -170,8 +175,10 @@ void sendData() {
     message += altitude;
     message += ",";
     message += latitude;
+    message += lat;
     message += ",";
     message += longitude;
+    message += lon;
     message += ",";
     message += message_no;
   
@@ -207,7 +214,6 @@ void readSensors() {
 //        return;  // we can fail to parse a sentence in which case we should just wait for another
 //      }
     }
-    Serial.println(GPS.longitude);
     longitude = GPS.longitude;
     lon = GPS.lon;
     latitude = GPS.latitude;
@@ -245,10 +251,14 @@ void deployParachute() {
     // turn off heater
     digitalWrite(HEATER, LOW);
     // make sure rockblock isn't transmitting
+    isbd.sleep();
     
-    // fill me in!
+    // cut
+    digitalWrite(NICHROME, HIGH);
     
     delay(10000);
+    digitalWrite(NICHROME, LOW); // turn off
+    isbd.begin();
 }
 
 /*
@@ -257,7 +267,7 @@ void deployParachute() {
 void writeHeaderToSD() {
     File myFile = SD.open("data.txt", FILE_WRITE);
     if(myFile) {
-      myFile.println("INTERNAL_TEMP,EXTERNAL_TEMP,PRESSURE,ALTITUDE,ALTITUDE_FT,LONGITUDE,LATITUDE");
+      myFile.println("INTERNAL_TEMP,EXTERNAL_TEMP,PRESSURE,ALTITUDE,ALTITUDE_FT,LONGITUDE,LATITUDE,TIME");
       Serial.println("wrote header");
       myFile.close();
     } else {
@@ -282,13 +292,16 @@ void writeDataToSD() {
         myFile.print(",");
         myFile.print(altitude_feet);
         myFile.print(",");
-        myFile.print(GPS.longitude + String(GPS.lon));
-//        Serial.print(GPS.longitude + String(GPS.lon)); Serial.print(", ");
+        myFile.print(longitude + String(lon));
         myFile.print(",");
-        myFile.print(GPS.latitude + String(GPS.lat));
-//        Serial.println(GPS.latitude + String(GPS.lat));
+        myFile.print(latitude + String(lat));
+        myFile.print(",");
+        myFile.print(hour());
+        myFile.print(":");
+        myFile.print(minute());
+        myFile.print(":");
+        myFile.print(second());
         myFile.println("");
-//        Serial.println("wrote to file");
         myFile.close();
     } else {
         Serial.println("error opening :(");
@@ -297,12 +310,10 @@ void writeDataToSD() {
 
 bool ISBDCallback() {
     readSensors();
-//    Serial.println("read sensors");
     writeDataToSD();
-//    Serial.println("in isbd callback");
 
     // run checks
-    checkAltitude();
+//    checkAltitude();
     regulateTemp();
     return true;
 }
