@@ -60,11 +60,13 @@ void useInterrupt(boolean); // Func prototype keeps Arduino 0023 happy
 // ========= CONSTANTS =========
 int TEMP_THRESHOLD = 0; // celcius
 int ALTITUDE_DIFF_THRESHOLD = 100; // meters
+int INTERVAL = 60; // seconds
 
 // ========= ROCKBLOCK =========
 #define ssSerial Serial3
 IridiumSBD isbd(ssSerial, 2); // second param = sleep pin 
 int message_no = 0;
+int seconds_elapsed = 0;
 
 
 // ========= SETUP FUNCTION =========
@@ -88,6 +90,7 @@ void setup() {
   GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
   GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);   // 1 Hz update rate
   GPS.sendCommand(PGCMD_ANTENNA); // Request updates on antenna status
+  useInterrupt(true);
   mySerial.println(PMTK_Q_RELEASE);
 
   pinMode(SD_CS, OUTPUT);
@@ -151,31 +154,36 @@ void loop() {
     regulateTemp();
     
     delay(1000);
+    seconds_elapsed++;
 }
 
 // ========= HELPER FUNCTIONS =========
 
 void sendData() {
-  char outBuffer[200];
-  String message = "";
-  message += internal_temp;
-  message += ",";
-  message += external_temp;
-  message += ",";
-  message += altitude;
-  message += ",";
-  message += latitude;
-  message += ",";
-  message += longitude;
-  message += ",";
-  message += message_no;
+  if (seconds_elapsed >= INTERVAL) {
+    char outBuffer[200];
+    String message = "";
+    message += internal_temp;
+    message += ",";
+    message += external_temp;
+    message += ",";
+    message += altitude;
+    message += ",";
+    message += latitude;
+    message += ",";
+    message += longitude;
+    message += ",";
+    message += message_no;
+  
+    for(uint8_t i = 0; i < message.length(); i++) {
+      outBuffer[i] = message[i];
+    }
+  
+    isbd.sendSBDText(outBuffer);
+    message_no++;
 
-  for(uint8_t i = 0; i < message.length(); i++) {
-    outBuffer[i] = message[i];
+    seconds_elapsed = 0;
   }
-
-  isbd.sendSBDText(outBuffer);
-  message_no++;
 }
 
 /* 
@@ -194,8 +202,8 @@ void readSensors() {
     // GPS
     char c = GPS.read();
     if (GPS.newNMEAreceived()) {
+      GPS.parse(GPS.lastNMEA());
 //      if (!GPS.parse(GPS.lastNMEA())) {  // this also sets the newNMEAreceived() flag to false
-//        Serial.println("in GPS thingie-----------------");
 //        return;  // we can fail to parse a sentence in which case we should just wait for another
 //      }
     }
@@ -274,11 +282,11 @@ void writeDataToSD() {
         myFile.print(",");
         myFile.print(altitude_feet);
         myFile.print(",");
-        myFile.print(longitude + String(lon));
-        Serial.print(longitude + String(lon)); Serial.print(", ");
+        myFile.print(GPS.longitude + String(GPS.lon));
+//        Serial.print(GPS.longitude + String(GPS.lon)); Serial.print(", ");
         myFile.print(",");
-        myFile.print(latitude + String(lat));
-        Serial.println(latitude + String(lat));
+        myFile.print(GPS.latitude + String(GPS.lat));
+//        Serial.println(GPS.latitude + String(GPS.lat));
         myFile.println("");
 //        Serial.println("wrote to file");
         myFile.close();
