@@ -48,8 +48,8 @@ int external_temp = 0;
 int pressure = 0;
 int altitude = 0;
 float altitude_feet = 0.0;
-float latitude = 0.0; char lat = ' ';
-float longitude = 0.0; char lon = ' ';
+float latitude = 0.0;
+float longitude = 0.0;
 
 // ========= HELPER FUNCTION PROTOTYPES =========
 void readSensors();
@@ -174,11 +174,9 @@ void sendData() {
     message += ",";
     message += altitude;
     message += ",";
-    message += latitude;
-    message += lat;
+    message += String(latitude, 4);
     message += ",";
-    message += longitude;
-    message += lon;
+    message += String(longitude,4);
     message += ",";
     message += message_no;
   
@@ -214,10 +212,8 @@ void readSensors() {
 //        return;  // we can fail to parse a sentence in which case we should just wait for another
 //      }
     }
-    longitude = GPS.longitude;
-    lon = GPS.lon;
-    latitude = GPS.latitude;
-    lat = GPS.lat;
+    longitude = GPS.longitudeDegrees;
+    latitude = GPS.latitudeDegrees;
 }
 
 /*
@@ -292,9 +288,9 @@ void writeDataToSD() {
         myFile.print(",");
         myFile.print(altitude_feet);
         myFile.print(",");
-        myFile.print(longitude + String(lon));
+        myFile.print(String(longitude, 4));
         myFile.print(",");
-        myFile.print(latitude + String(lat));
+        myFile.print(String(latitude,4));
         myFile.print(",");
         myFile.print(hour());
         myFile.print(":");
